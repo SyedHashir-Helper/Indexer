@@ -22,26 +22,32 @@ if 'word_counter' not in st.session_state:
     st.session_state.word_counter = Counter()  # Counter to store word frequencies across documents
 
 # Set a threshold for term frequency (e.g., words appearing more than once)
-TERM_FREQUENCY_THRESHOLD = 1
+TERM_FREQUENCY_THRESHOLD = 10
 
 import nltk
 nltk.download('averaged_perceptron_tagger')  # Ensure POS tagger is downloaded
 
 def preprocess(text):
-    """Preprocess the text by keeping only nouns, removing stop words, punctuation, and lemmatizing."""
+    """Preprocess the text by removing stop words, then keeping only unique nouns, and lemmatizing."""
     # Tokenize and remove punctuation
     words = re.findall(r'\b\w+\b', text.lower())
     
+    # Remove stop words before tagging
+    filtered_words = [word for word in words if word not in st.session_state.stop_words]
+    
     # Part-of-speech tagging
-    pos_tags = nltk.pos_tag(words)
+    pos_tags = nltk.pos_tag(filtered_words)
     
     # Filter and lemmatize only nouns
-    filtered_words = [
+    noun_words = [
         st.session_state.lemmatizer.lemmatize(word)
         for word, pos in pos_tags
-        if pos in ('NN', 'NNS', 'NNP', 'NNPS') and word not in st.session_state.stop_words
+        if pos in ('NN', 'NNS', 'NNP', 'NNPS')
     ]
-    return filtered_words
+    
+    # Remove duplicates while preserving order
+    unique_noun_words = list(dict.fromkeys(noun_words))
+    return unique_noun_words
 
 
 def get_synonyms(word):
@@ -60,7 +66,7 @@ def build_index(doc_id, content):
     st.session_state.word_counter.update(word_counts)  # Update global word frequency counter
     
     # Only include words that meet or exceed the threshold frequency
-    relevant_words = {word for word, count in word_counts.items() if count > TERM_FREQUENCY_THRESHOLD}
+    relevant_words = {word for word, count in word_counts.items() if count <= TERM_FREQUENCY_THRESHOLD}
     
     for word in relevant_words:
         # Insert document ID for the word itself
